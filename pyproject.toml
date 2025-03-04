@@ -1,0 +1,11 @@
+[project]
+name = "trad-save-history"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pybit>=5.9.0",
+    "python-dotenv>=1.0.1",
+    "sqlalchemy>=2.0.38",
+]
