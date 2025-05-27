@@ -37,6 +37,7 @@ Configure the application using environment variables or by editing the `.env` f
 - `DATABASE_URL`: SQLAlchemy database URL
 - `LOG_LEVEL`: Logging level (INFO, DEBUG, WARNING, ERROR)
 - `DATA_RETENTION_DAYS`: Number of days to retain data (for future cleanup jobs)
+- `TICKER_BATCH_SIZE`: Number of ticker records to batch before saving to database
 
 ## Usage
 
@@ -80,3 +81,4 @@ ECHO_SQL=False
 # Application Configuration
 LOG_LEVEL=INFO
 DATA_RETENTION_DAYS=30
+TICKER_BATCH_SIZE=1000  # Number of ticker records to batch before saving to database

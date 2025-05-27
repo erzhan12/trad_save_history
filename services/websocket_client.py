@@ -3,7 +3,10 @@ import json
 from datetime import datetime
 from typing import Dict, List, Callable, Any
 from pybit.unified_trading import WebSocket
-from config.settings import API_KEY, API_SECRET, TESTNET, WS_PRIVATE, SYMBOLS, CHANNELS
+from config.settings import (
+    API_KEY, API_SECRET, TESTNET, WS_PRIVATE, SYMBOLS, CHANNELS, 
+    TICKER_BATCH_SIZE, DB_SIZE_CHECK_INTERVAL
+)
 import time
 from models.market_data import TickerData
 from sqlalchemy.orm import Session
@@ -13,6 +16,8 @@ import asyncio
 import threading
 from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
+import os
+from config.settings import DATABASE_URL
 
 logger = logging.getLogger("bybit_collector.websocket")
 
@@ -27,6 +32,10 @@ class BybitWebSocketClient:
         self.save_queue = Queue()
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.save_thread = None
+        self.last_db_size_check = time.time()
+        self.db_size_check_interval = DB_SIZE_CHECK_INTERVAL
+        self.initial_db_size = self._get_db_size()  # Store initial size
+        logger.info(f"Initial database size: {self.initial_db_size:.2f} MB")
         self._start_save_thread()
         
     def _start_save_thread(self):
@@ -47,13 +56,42 @@ class BybitWebSocketClient:
             finally:
                 self.save_queue.task_done()
 
+    def _get_db_size(self) -> float:
+        """Get the size of the database file in megabytes."""
+        try:
+            db_path = DATABASE_URL.replace('sqlite:///', '')
+            if os.path.exists(db_path):
+                size_bytes = os.path.getsize(db_path)
+                return size_bytes
+            return 0.0
+        except Exception as e:
+            logger.error(f"Error getting database size: {e}")
+            return 0.0
+
+    def _check_db_size(self):
+        """Check and log database size if enough time has passed."""
+        current_time = time.time()
+        if current_time - self.last_db_size_check >= self.db_size_check_interval:
+            current_size = self._get_db_size()
+            size_growth = current_size - self.initial_db_size
+            logger.info(
+                f"Database size: {current_size:.2f} B | "
+                f"Growth since start: {size_growth:.2f} B | "
+                f"Growth rate: {size_growth / ((current_time - self.last_db_size_check) / 3600):.2f} B/hour"
+            )
+            self.last_db_size_check = current_time
+
     def _save_to_database(self, data_to_save):
         """Save ticker data to database synchronously."""
+        start_time = time.time()
         try:
-            with Session(get_db()) as session:
+            # Get a database session from the generator
+            db = next(get_db())
+            try:
                 ticker_objects = []
                 for data in data_to_save:
                     ticker = TickerData(
+                        timestamp=data['timestamp'],
                         symbol=data['symbol'],
                         tick_direction=data['tickDirection'],
                         price_24h_pcnt=float(data['price24hPcnt']),
@@ -77,12 +115,24 @@ class BybitWebSocketClient:
                     )
                     ticker_objects.append(ticker)
                 
-                session.bulk_save_objects(ticker_objects)
-                session.commit()
+                db.bulk_save_objects(ticker_objects)
+                db.commit()
+                
+                # Check database size after saving
+                self._check_db_size()
+                
+            except Exception as e:
+                logger.error(f"Error saving ticker data: {e}")
+                db.rollback()
+            finally:
+                db.close()
                 
         except Exception as e:
-            logger.error(f"Error saving ticker data: {e}")
-            session.rollback()
+            logger.error(f"Error getting database session: {e}")
+        finally:
+            end_time = time.time()
+            execution_time = end_time - start_time
+            logger.info(f"Database save execution time: {execution_time:.4f} seconds for {len(data_to_save)} records")
 
     def _generate_subscriptions(self) -> List[str]:
         """Generate subscription topics based on configured symbols and channels."""
@@ -142,17 +192,20 @@ class BybitWebSocketClient:
 
     def handle_ticker(self, message):
         try:
-            ticker_data = message['data']
-            print(f'handle ticker Last Price: {ticker_data["lastPrice"]} {ticker_data["turnover24h"]}')
+            ticker_data = message['data'].copy()  # Create a copy of incoming data
+            ticker_data['timestamp'] = datetime.now()
+            # print(f'handle ticker Last Price: {ticker_data["lastPrice"]} {ticker_data["turnover24h"]}')
             
             # If this is the first entry, append it
             if not self.ticker_data:
                 self.ticker_data.append(ticker_data)
+                # print(f'First append ticker Last Price: {ticker_data["lastPrice"]} {ticker_data["turnover24h"]}')
                 return
 
             # Get the last entry
             last_data = self.ticker_data[-1]
-            
+            # print(f'last_data: {last_data}')
+            # print(f'ticker data size: {len(self.ticker_data)}')
             # Compare all fields except timestamp-related ones
             fields_to_compare = [
                 'symbol', 'tickDirection', 'price24hPcnt', 'lastPrice',
@@ -161,28 +214,31 @@ class BybitWebSocketClient:
                 'turnover24h', 'volume24h', 'nextFundingTime', 'fundingRate',
                 'bid1Price', 'bid1Size', 'ask1Price', 'ask1Size'
             ]
+            # print(f'last_data[lastPrice]: {last_data["lastPrice"]}')
+            # print(f'ticker_data[lastPrice]: {ticker_data["lastPrice"]}')
             
             # Check if any field has changed
             has_changes = any(
                 ticker_data[field] != last_data[field]
                 for field in fields_to_compare
             )
+            # print(f'has_changes: {has_changes}')
             
             # Only append if there are changes
             if has_changes:
-                self.ticker_data.append(ticker_data)
+                self.ticker_data.append(ticker_data)  # Append the copy
+                # print(f'Changed handle ticker Last Price: {ticker_data["lastPrice"]} {ticker_data["turnover24h"]}')
                 
-                # When the internal table has 1000 rows, queue for saving
-                if len(self.ticker_data) >= 1000:
-                    # Create a copy of current data
+                # When the internal table reaches the configured batch size, queue for saving
+                if len(self.ticker_data) >= TICKER_BATCH_SIZE:
                     data_to_save = self.ticker_data.copy()
-                    self.ticker_data = []  # Clear immediately
-                    
-                    # Queue the save operation
+                    self.ticker_data = []
+                    print(f'save to database: {len(data_to_save)}')
+                    logger.info(f'save to database: {len(data_to_save)}')
                     self.save_queue.put(data_to_save)
                 
-        except KeyError:
-            pass
+        except KeyError as e:
+            print(f"KeyError in handle_ticker: {e}")
 
     def connect_private(self):
         """Connect to Bybit WebSocket API and subscribe to channels."""
