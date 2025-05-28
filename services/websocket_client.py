@@ -11,13 +11,14 @@ import time
 from models.market_data import TickerData
 from sqlalchemy.orm import Session
 from datetime import datetime
-from db.database import get_db
+from db.database import get_db, engine
 import asyncio
 import threading
 from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 import os
 from config.settings import DATABASE_URL
+from sqlalchemy import text
 
 logger = logging.getLogger("bybit_collector.websocket")
 
@@ -35,7 +36,7 @@ class BybitWebSocketClient:
         self.last_db_size_check = time.time()
         self.db_size_check_interval = DB_SIZE_CHECK_INTERVAL
         self.initial_db_size = self._get_db_size()  # Store initial size
-        logger.info(f"Initial database size: {self.initial_db_size:.2f} MB")
+        logger.info(f"Initial database size: {self.initial_db_size:.2f} bytes")
         self._start_save_thread()
         
     def _start_save_thread(self):
@@ -57,13 +58,20 @@ class BybitWebSocketClient:
                 self.save_queue.task_done()
 
     def _get_db_size(self) -> float:
-        """Get the size of the database file in megabytes."""
+        """Get the size of the database in bytes."""
         try:
-            db_path = DATABASE_URL.replace('sqlite:///', '')
-            if os.path.exists(db_path):
-                size_bytes = os.path.getsize(db_path)
-                return size_bytes
-            return 0.0
+            with engine.connect() as conn:
+                # Different queries for different database types
+                if DATABASE_URL.startswith('sqlite'):
+                    result = conn.execute(text("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()"))
+                elif DATABASE_URL.startswith('postgresql'):
+                    result = conn.execute(text("SELECT pg_database_size(current_database())"))
+                else:
+                    logger.warning("Database size check not implemented for this database type")
+                    return 0.0
+                
+                size_bytes = result.scalar()
+                return float(size_bytes)
         except Exception as e:
             logger.error(f"Error getting database size: {e}")
             return 0.0
@@ -75,9 +83,9 @@ class BybitWebSocketClient:
             current_size = self._get_db_size()
             size_growth = current_size - self.initial_db_size
             logger.info(
-                f"Database size: {current_size:.2f} B | "
-                f"Growth since start: {size_growth:.2f} B | "
-                f"Growth rate: {size_growth / ((current_time - self.last_db_size_check) / 3600):.2f} B/hour"
+                f"Database size: {current_size:.2f} bytes | "
+                f"Growth since start: {size_growth:.2f} bytes | "
+                f"Growth rate: {size_growth / ((current_time - self.last_db_size_check) / 3600):.2f} bytes/hour"
             )
             self.last_db_size_check = current_time
 
@@ -119,7 +127,7 @@ class BybitWebSocketClient:
                 db.commit()
                 
                 # Check database size after saving
-                self._check_db_size()
+                # self._check_db_size()
                 
             except Exception as e:
                 logger.error(f"Error saving ticker data: {e}")
@@ -185,7 +193,8 @@ class BybitWebSocketClient:
                 testnet=False,
                 channel_type='linear'
             )
-            self.ws_public.ticker_stream('BTCUSDT', self.handle_ticker)
+            for symbol in SYMBOLS:  # Subscribe to all symbols
+                self.ws_public.ticker_stream(symbol, self.handle_ticker)
         except Exception as e:
             logger.exception(f"Failed to connect to WebSocket: {e}")
             raise
@@ -261,10 +270,10 @@ class BybitWebSocketClient:
             )
             
             # Generate subscription topics
-            self.subscriptions = self._generate_subscriptions()
+            # self.subscriptions = self._generate_subscriptions()
             
             # Log subscriptions
-            logger.info(f"Subscribing to: {self.subscriptions}")
+            # logger.info(f"Subscribing to: {self.subscriptions}")
             
             # Subscribe to topics
             self.ws_private.subscribe(self.subscriptions)

@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Any
 from sqlalchemy.orm import Session
-from models.market_data import Orderbook, Trade, Kline, TickerData
+from models.market_data import TickerData
 from sqlalchemy.orm import sessionmaker
 
 logger = logging.getLogger("bybit_collector.processor")

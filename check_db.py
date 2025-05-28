@@ -1,39 +1,38 @@
-import sqlite3
 import pandas as pd
 from datetime import datetime, timedelta
 import argparse
 from tabulate import tabulate
-from config.settings import DATABASE_URL
-
-def get_db_connection():
-    """Create a connection to the SQLite database."""
-    # Extract the database path from the SQLAlchemy URL
-    db_path = DATABASE_URL.replace('sqlite:///', '')
-    return sqlite3.connect(db_path)
+from utils.db_connect import get_db_connection, execute_query
 
 def get_table_names(conn):
     """Get list of all tables in the database."""
     cursor = conn.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    return [table[0] for table in cursor.fetchall()]
+    if conn.__class__.__name__ == 'SQLiteConnection':
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    else:
+        cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
+    return [row[0] for row in cursor.fetchall()]
 
 def get_table_info(conn, table_name):
     """Get column information for a specific table."""
     cursor = conn.cursor()
-    cursor.execute(f"PRAGMA table_info({table_name});")
-    return cursor.fetchall()
-
-def get_recent_ticker_data(conn, limit=10, symbol=None):
-    """Get recent ticker data with optional symbol filter."""
-    query = """
-    SELECT timestamp, symbol, last_price, volume_24h, turnover_24h, funding_rate
-    FROM ticker_data
-    """
-    if symbol:
-        query += f" WHERE symbol = '{symbol}'"
-    query += " ORDER BY timestamp DESC LIMIT ?"
-    
-    return pd.read_sql_query(query, conn, params=(limit,))
+    if conn.__class__.__name__ == 'SQLiteConnection':
+        cursor.execute(f"PRAGMA table_info({table_name});")
+        return cursor.fetchall()
+    else:
+        cursor.execute("""
+            SELECT 
+                ordinal_position as cid,
+                column_name as name,
+                data_type as type,
+                is_nullable = 'NO' as notnull,
+                column_default as dflt_value,
+                CASE WHEN is_identity = 'YES' THEN 1 ELSE 0 END as pk
+            FROM information_schema.columns 
+            WHERE table_name = %s
+            ORDER BY ordinal_position;
+        """, (table_name,))
+        return cursor.fetchall()
 
 def get_ticker_stats(conn, symbol=None):
     """Get statistics for ticker data."""
@@ -54,6 +53,17 @@ def get_ticker_stats(conn, symbol=None):
     
     return pd.read_sql_query(query, conn)
 
+def get_recent_ticker_data(conn, limit=10, symbol=None):
+    """Get recent ticker data."""
+    query = """
+    SELECT * FROM ticker_data
+    """
+    if symbol:
+        query += f" WHERE symbol = '{symbol}'"
+    query += f" ORDER BY timestamp DESC LIMIT {limit}"
+    
+    return pd.read_sql_query(query, conn)
+
 def main():
     parser = argparse.ArgumentParser(description='Check Bybit database data')
     parser.add_argument('--tables', action='store_true', help='List all tables')
@@ -65,7 +75,7 @@ def main():
     args = parser.parse_args()
     
     try:
-        conn = get_db_connection()
+        conn, _ = get_db_connection()
         
         if args.tables:
             tables = get_table_names(conn)
