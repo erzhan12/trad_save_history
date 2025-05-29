@@ -25,7 +25,7 @@ logger = logging.getLogger("bybit_collector.websocket")
 
 class BybitWebSocketClient:
     def __init__(self, message_handler: Callable[[str, Dict[str, Any]], None]):
-        self.ticker_data = []
+        self.ticker_data = {}
         self.message_handler = message_handler
         self.ws_public = None
         self.ws_private = None
@@ -33,10 +33,7 @@ class BybitWebSocketClient:
         self.save_queue = Queue()
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.save_thread = None
-        self.last_db_size_check = time.time()
-        self.db_size_check_interval = DB_SIZE_CHECK_INTERVAL
-        self.initial_db_size = self._get_db_size()  # Store initial size
-        logger.info(f"Initial database size: {self.initial_db_size:.2f} bytes")
+        self.db_size_checker = Db_size_checker()
         self._start_save_thread()
         
     def _start_save_thread(self):
@@ -57,37 +54,7 @@ class BybitWebSocketClient:
             finally:
                 self.save_queue.task_done()
 
-    def _get_db_size(self) -> float:
-        """Get the size of the database in bytes."""
-        try:
-            with engine.connect() as conn:
-                # Different queries for different database types
-                if DATABASE_URL.startswith('sqlite'):
-                    result = conn.execute(text("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()"))
-                elif DATABASE_URL.startswith('postgresql'):
-                    result = conn.execute(text("SELECT pg_database_size(current_database())"))
-                else:
-                    logger.warning("Database size check not implemented for this database type")
-                    return 0.0
-                
-                size_bytes = result.scalar()
-                return float(size_bytes)
-        except Exception as e:
-            logger.error(f"Error getting database size: {e}")
-            return 0.0
-
-    def _check_db_size(self):
-        """Check and log database size if enough time has passed."""
-        current_time = time.time()
-        if current_time - self.last_db_size_check >= self.db_size_check_interval:
-            current_size = self._get_db_size()
-            size_growth = current_size - self.initial_db_size
-            logger.info(
-                f"Database size: {current_size:.2f} bytes | "
-                f"Growth since start: {size_growth:.2f} bytes | "
-                f"Growth rate: {size_growth / ((current_time - self.last_db_size_check) / 3600):.2f} bytes/hour"
-            )
-            self.last_db_size_check = current_time
+    
 
     def _save_to_database(self, data_to_save):
         """Save ticker data to database synchronously."""
@@ -127,7 +94,7 @@ class BybitWebSocketClient:
                 db.commit()
                 
                 # Check database size after saving
-                # self._check_db_size()
+                self.db_size_checker.check_db_size()
                 
             except Exception as e:
                 logger.error(f"Error saving ticker data: {e}")
@@ -142,49 +109,49 @@ class BybitWebSocketClient:
             execution_time = end_time - start_time
             logger.info(f"Database save execution time: {execution_time:.4f} seconds for {len(data_to_save)} records")
 
-    def _generate_subscriptions(self) -> List[str]:
-        """Generate subscription topics based on configured symbols and channels."""
-        subscriptions = []
-        for symbol in SYMBOLS:
-            for channel in CHANNELS:
-                topic = f"{channel}.{symbol}"
-                subscriptions.append(topic)
-        return subscriptions
+    # def _generate_subscriptions(self) -> List[str]:
+    #     """Generate subscription topics based on configured symbols and channels."""
+    #     subscriptions = []
+    #     for symbol in SYMBOLS:
+    #         for channel in CHANNELS:
+    #             topic = f"{channel}.{symbol}"
+    #             subscriptions.append(topic)
+    #     return subscriptions
         
-    def _handle_message(self, message: str):
-        """Process incoming WebSocket messages."""
-        try:
-            data = json.loads(message)
+    # def _handle_message(self, message: str):
+    #     """Process incoming WebSocket messages."""
+    #     try:
+    #         data = json.loads(message)
             
-            # Handle ping messages
-            if "op" in data and data["op"] == "ping":
-                logger.debug("Received ping, sending pong")
-                return
+    #         # Handle ping messages
+    #         if "op" in data and data["op"] == "ping":
+    #             logger.debug("Received ping, sending pong")
+    #             return
                 
-            # Handle subscription confirmation
-            if "op" in data and data["op"] == "subscribe":
-                logger.info(f"Successfully subscribed to: {data.get('args', [])}")
-                return
+    #         # Handle subscription confirmation
+    #         if "op" in data and data["op"] == "subscribe":
+    #             logger.info(f"Successfully subscribed to: {data.get('args', [])}")
+    #             return
                 
-            # Handle errors
-            if "success" in data and not data["success"]:
-                logger.error(f"Error from WebSocket: {data}")
-                return
+    #         # Handle errors
+    #         if "success" in data and not data["success"]:
+    #             logger.error(f"Error from WebSocket: {data}")
+    #             return
                 
-            # Handle actual data messages
-            if "topic" in data and "data" in data:
-                topic = data["topic"]
-                topic_parts = topic.split(".")
+    #         # Handle actual data messages
+    #         if "topic" in data and "data" in data:
+    #             topic = data["topic"]
+    #             topic_parts = topic.split(".")
                 
-                # Determine channel type (orderbook, trade, kline)
-                channel_type = topic_parts[0]
+    #             # Determine channel type (orderbook, trade, kline)
+    #             channel_type = topic_parts[0]
                 
-                # Pass to message handler
-                self.message_handler(channel_type, data)
-        except json.JSONDecodeError:
-            logger.error(f"Failed to decode WebSocket message: {message}")
-        except Exception as e:
-            logger.exception(f"Error processing WebSocket message: {e}")
+    #             # Pass to message handler
+    #             self.message_handler(channel_type, data)
+    #     except json.JSONDecodeError:
+    #         logger.error(f"Failed to decode WebSocket message: {message}")
+    #     except Exception as e:
+    #         logger.exception(f"Error processing WebSocket message: {e}")
             
     def connect_public(self):
         """Connect to Bybit WebSocket API and subscribe to channels."""
@@ -203,25 +170,28 @@ class BybitWebSocketClient:
         try:
             ticker_data = message['data'].copy()  # Create a copy of incoming data
             ticker_data['timestamp'] = datetime.now()
-            # print(f'handle ticker Last Price: {ticker_data["lastPrice"]} {ticker_data["turnover24h"]}')
+            symbol = ticker_data['symbol']
+            # print(f'handle ticker Last Price: {symbol} {ticker_data["lastPrice"]} {ticker_data["turnover24h"]}')
             
             # If this is the first entry, append it
-            if not self.ticker_data:
-                self.ticker_data.append(ticker_data)
-                # print(f'First append ticker Last Price: {ticker_data["lastPrice"]} {ticker_data["turnover24h"]}')
+            if not self.ticker_data.get(symbol):
+                self.ticker_data[symbol] = []
+                self.ticker_data[symbol].append(ticker_data)
+                print(f'First append ticker Last Price: {ticker_data["lastPrice"]} {ticker_data["turnover24h"]}')
                 return
 
-            # Get the last entry
-            last_data = self.ticker_data[-1]
+            # Get the last entry for the symbol
+            last_data = self.ticker_data[symbol][-1]
             # print(f'last_data: {last_data}')
             # print(f'ticker data size: {len(self.ticker_data)}')
             # Compare all fields except timestamp-related ones
             fields_to_compare = [
-                'symbol', 'tickDirection', 'price24hPcnt', 'lastPrice',
-                'prevPrice24h', 'highPrice24h', 'lowPrice24h', 'prevPrice1h',
-                'markPrice', 'indexPrice', 'openInterest', 'openInterestValue',
-                'turnover24h', 'volume24h', 'nextFundingTime', 'fundingRate',
-                'bid1Price', 'bid1Size', 'ask1Price', 'ask1Size'
+                # 'symbol', 'tickDirection', 'price24hPcnt', 
+                'lastPrice',
+                # 'prevPrice24h', 'highPrice24h', 'lowPrice24h', 'prevPrice1h',
+                # 'markPrice', 'indexPrice', 'openInterest', 'openInterestValue',
+                # 'turnover24h', 'volume24h', 'nextFundingTime', 'fundingRate',
+                # 'bid1Price', 'bid1Size', 'ask1Price', 'ask1Size'
             ]
             # print(f'last_data[lastPrice]: {last_data["lastPrice"]}')
             # print(f'ticker_data[lastPrice]: {ticker_data["lastPrice"]}')
@@ -235,13 +205,13 @@ class BybitWebSocketClient:
             
             # Only append if there are changes
             if has_changes:
-                self.ticker_data.append(ticker_data)  # Append the copy
+                self.ticker_data[symbol].append(ticker_data)  # Append the copy
                 # print(f'Changed handle ticker Last Price: {ticker_data["lastPrice"]} {ticker_data["turnover24h"]}')
                 
                 # When the internal table reaches the configured batch size, queue for saving
-                if len(self.ticker_data) >= TICKER_BATCH_SIZE:
-                    data_to_save = self.ticker_data.copy()
-                    self.ticker_data = []
+                if len(self.ticker_data[symbol]) >= TICKER_BATCH_SIZE:
+                    data_to_save = self.ticker_data[symbol].copy()
+                    self.ticker_data[symbol] = []
                     print(f'save to database: {len(data_to_save)}')
                     logger.info(f'save to database: {len(data_to_save)}')
                     self.save_queue.put(data_to_save)
@@ -298,3 +268,43 @@ class BybitWebSocketClient:
         if self.save_thread:
             self.save_thread.join()
         self.executor.shutdown(wait=True)
+
+
+class Db_size_checker:
+    def __init__(self):
+        self.last_db_size_check = time.time()
+        self.db_size_check_interval = DB_SIZE_CHECK_INTERVAL
+        self.initial_db_size = self._get_db_size() / (1024 * 1024)  # Store initial size
+        logger.info(f"Initial database size: {self.initial_db_size:.2f} MB")
+
+    def _get_db_size(self) -> float:
+        """Get the size of the database in bytes."""
+        try:
+            with engine.connect() as conn:
+                # Different queries for different database types
+                if DATABASE_URL.startswith('sqlite'):
+                    result = conn.execute(text("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()"))
+                elif DATABASE_URL.startswith('postgresql'):
+                    result = conn.execute(text("SELECT pg_database_size(current_database())"))
+                else:
+                    logger.warning("Database size check not implemented for this database type")
+                    return 0.0
+                
+                size_bytes = result.scalar()
+                return float(size_bytes)
+        except Exception as e:
+            logger.error(f"Error getting database size: {e}")
+            return 0.0
+
+    def check_db_size(self):
+        """Check and log database size if enough time has passed."""
+        current_time = time.time()
+        if current_time - self.last_db_size_check >= self.db_size_check_interval:
+            current_size = self._get_db_size() / (1024 * 1024) 
+            size_growth = current_size - self.initial_db_size
+            logger.info(
+                f"Database size: {current_size:.2f}  MB | "
+                f"Growth since start: {size_growth:.2f} MB | "
+                f"Growth rate: {size_growth / ((current_time - self.last_db_size_check) / 3600):.2f} MB/hour"
+            )
+            self.last_db_size_check = current_time
