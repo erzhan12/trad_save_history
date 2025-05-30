@@ -1,11 +1,15 @@
-from config.settings import DATABASE_URL, DB_SIZE_CHECK_INTERVAL
-import time
 import logging
+import time
+
 from sqlalchemy import text
+
+from config.settings import DATABASE_URL, DB_SIZE_CHECK_INTERVAL
 from db.database import engine
-from typing import Optional
+
+# from typing import Optional
 
 logger = logging.getLogger("bybit_collector.db_size_checker")
+
 
 class DBSizeChecker:
     """Monitors and reports database size growth over time."""
@@ -15,13 +19,16 @@ class DBSizeChecker:
         self.last_db_size_check: float = time.time()
         self.initial_time: float = time.time()
         self.db_size_check_interval: int = DB_SIZE_CHECK_INTERVAL
-        self.initial_db_size: float = self._get_db_size() / (1024 * 1024)  # Store initial size in MB
+        self.initial_db_size: float = self._get_db_size() / (1024 * 1024)  # Store initial size 
         logger.info(f"Initial database size: {self.initial_db_size:.2f} MB")
 
     def _get_sqlite_size(self) -> float:
         """Get the size of SQLite database in bytes."""
         with engine.connect() as conn:
-            result = conn.execute(text("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()"))
+            result = conn.execute(text("""
+                SELECT page_count * page_size as size 
+                FROM pragma_page_count(), pragma_page_size()
+            """))
             return float(result.scalar())
 
     def _get_postgresql_size(self) -> float:

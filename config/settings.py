@@ -1,4 +1,5 @@
 import os
+
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -37,5 +38,5 @@ ECHO_SQL = os.getenv("ECHO_SQL", "False").lower() in ("true", "1", "t")
 # Application Configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 DATA_RETENTION_DAYS = int(os.getenv("DATA_RETENTION_DAYS", "30"))
-TICKER_BATCH_SIZE = int(os.getenv("TICKER_BATCH_SIZE", "100"))  # Number of ticker records to batch before saving
+TICKER_BATCH_SIZE = int(os.getenv("TICKER_BATCH_SIZE", "100"))  # Number of ticker records to batch 
 DB_SIZE_CHECK_INTERVAL = int(os.getenv("DB_SIZE_CHECK_INTERVAL", "30"))

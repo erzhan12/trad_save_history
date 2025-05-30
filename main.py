@@ -1,13 +1,13 @@
 import signal
 import sys
 import time
-from contextlib import contextmanager
-from sqlalchemy.orm import Session
 
-from db.database import engine, Base, SessionLocal
-from utils.logging_config import setup_logging
-from services.websocket_client import BybitWebSocketClient
+# from contextlib import contextmanager
+# from sqlalchemy.orm import Session
+from db.database import Base, engine
 from services.data_processor import DataProcessor
+from services.websocket_client import BybitWebSocketClient
+from utils.logging_config import setup_logging
 
 # Setup logging
 logger = setup_logging()
@@ -21,16 +21,6 @@ def cleanup(ws_client):
     logger.info("Application stopped")
 
 
-# @contextmanager
-# def get_db_session():
-#     """Provide a transactional scope around a series of operations."""
-#     session = SessionLocal()
-#     try:
-#         yield session
-#     finally:
-#         session.close()
-
-
 def main():
     """Main application entry point."""
     ws_client = None
@@ -42,7 +32,7 @@ def main():
 
         # Create database session
         # with get_db_session() as db_session:
-            # Initialize data processor
+        # Initialize data processor
         data_processor = DataProcessor()
 
         # Define message handler

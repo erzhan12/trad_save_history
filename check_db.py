@@ -1,8 +1,10 @@
-import pandas as pd
-from datetime import datetime, timedelta
 import argparse
+
+import pandas as pd
 from tabulate import tabulate
-from utils.db_connect import get_db_connection, execute_query
+
+from utils.db_connect import get_db_connection
+
 
 def get_table_names(conn):
     """Get list of all tables in the database."""
@@ -12,6 +14,7 @@ def get_table_names(conn):
     else:
         cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
     return [row[0] for row in cursor.fetchall()]
+
 
 def get_table_info(conn, table_name):
     """Get column information for a specific table."""
@@ -34,6 +37,7 @@ def get_table_info(conn, table_name):
         """, (table_name,))
         return cursor.fetchall()
 
+
 def get_ticker_stats(conn, symbol=None):
     """Get statistics for ticker data."""
     query = """
@@ -53,6 +57,7 @@ def get_ticker_stats(conn, symbol=None):
     
     return pd.read_sql_query(query, conn)
 
+
 def get_recent_ticker_data(conn, limit=10, symbol=None):
     """Get recent ticker data."""
     query = """
@@ -63,6 +68,7 @@ def get_recent_ticker_data(conn, limit=10, symbol=None):
     query += f" ORDER BY timestamp DESC LIMIT {limit}"
     
     return pd.read_sql_query(query, conn)
+
 
 def main():
     parser = argparse.ArgumentParser(description='Check Bybit database data')
@@ -103,6 +109,7 @@ def main():
     finally:
         if 'conn' in locals():
             conn.close()
+
 
 if __name__ == "__main__":
     main() 

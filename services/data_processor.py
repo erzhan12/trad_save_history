@@ -1,15 +1,18 @@
 import logging
-from datetime import datetime
-from typing import Dict, Any
-from sqlalchemy.orm import Session
-from models.market_data import TickerData
-from sqlalchemy.orm import sessionmaker
+
+# from sqlalchemy.orm import sessionmaker
 import threading
-from queue import Queue
 import time
-from db.database import get_db, engine
-from services.db_size_checker import DBSizeChecker
 from concurrent.futures import ThreadPoolExecutor
+from queue import Queue
+
+from db.database import get_db
+
+# from datetime import datetime
+# from typing import Dict, Any
+# from sqlalchemy.orm import Session
+from models.market_data import TickerData
+from services.db_size_checker import DBSizeChecker
 
 logger = logging.getLogger("bybit_collector.processor")
 
@@ -98,4 +101,5 @@ class DataProcessor:
         finally:
             end_time = time.time()
             execution_time = end_time - start_time
-            logger.info(f"Database save execution time: {execution_time:.4f} seconds for {len(data_to_save)} records")
+            logger.info(f"Database save execution time: {execution_time:.4f} seconds "
+                        f"for {len(data_to_save)} records")
