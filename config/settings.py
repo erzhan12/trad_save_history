@@ -11,7 +11,7 @@ TESTNET = os.getenv("USE_TESTNET", "False").lower() in ("true", "1", "t")
 
 # WebSocket Configuration
 WS_PRIVATE = os.getenv("WS_PRIVATE", "False").lower() in ("true", "1", "t")
-SYMBOLS = os.getenv("SYMBOLS", "BTCUSDT,ETHUSDT").split(",")
+SYMBOLS = os.getenv("SYMBOLS", "BTCUSDT,ETHUSDT,LTCUSDT,SOLUSDT").split(",")
 CHANNELS = os.getenv("CHANNELS", "orderbook.50,trade,kline.1m").split(",")
 
 # Database Configuration

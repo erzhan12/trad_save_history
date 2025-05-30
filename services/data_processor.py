@@ -4,147 +4,98 @@ from typing import Dict, Any
 from sqlalchemy.orm import Session
 from models.market_data import TickerData
 from sqlalchemy.orm import sessionmaker
+import threading
+from queue import Queue
+import time
+from db.database import get_db, engine
+from services.db_size_checker import DBSizeChecker
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger("bybit_collector.processor")
 
 
 class DataProcessor:
-    def __init__(self, db_session: Session):
-        self.db_session = db_session
+    def __init__(self):
+        self.save_thread = None
+        self.save_queue = Queue()
+        self.db_size_checker = DBSizeChecker()
+        self.executor = ThreadPoolExecutor(max_workers=1)
+        self._start_save_thread()
 
-    def process_message(self, channel_type: str, message: Dict[str, Any]):
-        """Process and save WebSocket message data based on channel type."""
+    def _start_save_thread(self):
+        """Start the save thread."""
+        self.save_thread = threading.Thread(target=self._save_worker, daemon=True)
+        self.save_thread.start()
+
+    def _save_worker(self):
+        """Worker thread that processes save operations."""
+        while True:
+            data_to_save = self.save_queue.get()
+            if data_to_save is None:  # Shutdown signal
+                break
+            try:
+                self._save_to_database(data_to_save)
+            except Exception as e:
+                logger.error(f"Error in save thread: {e}")
+            finally:
+                self.save_queue.task_done()
+
+    def stop(self):
+        # Signal save thread to stop
+        self.save_queue.put(None)
+        if self.save_thread:
+            self.save_thread.join()
+        self.executor.shutdown(wait=True)
+
+    def _save_to_database(self, data_to_save):
+        """Save ticker data to database synchronously."""
+        start_time = time.time()
         try:
-            if channel_type.startswith("orderbook"):
-                self._process_orderbook(message)
-            elif channel_type == "trade":
-                self._process_trade(message)
-            elif channel_type.startswith("kline"):
-                self._process_kline(message)
-            else:
-                logger.warning(f"Unknown channel type: {channel_type}")
-        except Exception as e:
-            logger.exception(f"Error processing {channel_type} data: {e}")
-
-    def _process_orderbook(self, message: Dict[str, Any]):
-        """Process orderbook data."""
-        try:
-            topic = message["topic"]
-            symbol = topic.split(".")[-1]
-            data = message["data"]
-
-            # Create orderbook entry
-            orderbook = Orderbook(
-                symbol=symbol,
-                timestamp=datetime.fromtimestamp(data["ts"] / 1000),
-                asks=data["a"],
-                bids=data["b"]
-            )
-
-            # Save to database
-            self.db_session.add(orderbook)
-            self.db_session.commit()
-
-            logger.debug(f"Saved orderbook for {symbol}")
-        except Exception as e:
-            self.db_session.rollback()
-            logger.exception(f"Error saving orderbook data: {e}")
-
-    def _process_trade(self, message: Dict[str, Any]):
-        """Process trade data."""
-        try:
-            topic = message["topic"]
-            symbol = topic.split(".")[-1]
-            trades_data = message["data"]
-
-            for trade_data in trades_data:
-                # Check if trade already exists
-                existing_trade = self.db_session.query(Trade).filter_by(trade_id=trade_data["i"]).first()
-                if existing_trade:
-                    continue
-
-                # Create trade entry
-                trade = Trade(
-                    symbol=symbol,
-                    timestamp=datetime.fromtimestamp(int(trade_data["T"]) / 1000),
-                    trade_id=trade_data["i"],
-                    price=float(trade_data["p"]),
-                    size=float(trade_data["v"]),
-                    side=trade_data["S"]
-                )
-
-                # Save to database
-                self.db_session.add(trade)
-
-            self.db_session.commit()
-            logger.debug(f"Saved {len(trades_data)} trades for {symbol}")
-        except Exception as e:
-            self.db_session.rollback()
-            logger.exception(f"Error saving trade data: {e}")
-
-    def _process_kline(self, message: Dict[str, Any]):
-        """Process kline (candle) data."""
-        try:
-            topic = message["topic"]
-            topic_parts = topic.split(".")
-            interval = topic_parts[1]
-            symbol = topic_parts[2]
-            klines_data = message["data"]
-
-            for kline_data in klines_data:
-                # Convert timestamp to datetime
-                start_time = datetime.fromtimestamp(int(kline_data["start"]) / 1000)
-
-                # Check if kline already exists
-                existing_kline = self.db_session.query(Kline).filter_by(
-                    symbol=symbol,
-                    interval=interval,
-                    start_time=start_time
-                ).first()
-
-                # Update or create kline
-                if existing_kline:
-                    existing_kline.open_price = float(kline_data["open"])
-                    existing_kline.high_price = float(kline_data["high"])
-                    existing_kline.low_price = float(kline_data["low"])
-                    existing_kline.close_price = float(kline_data["close"])
-                    existing_kline.volume = float(kline_data["volume"])
-                else:
-                    kline = Kline(
-                        symbol=symbol,
-                        interval=interval,
-                        start_time=start_time,
-                        open_price=float(kline_data["open"]),
-                        high_price=float(kline_data["high"]),
-                        low_price=float(kline_data["low"]),
-                        close_price=float(kline_data["close"]),
-                        volume=float(kline_data["volume"])
+            # Get a database session from the generator
+            db = next(get_db())
+            try:
+                ticker_objects = []
+                for data in data_to_save:
+                    ticker = TickerData(
+                        timestamp=data['timestamp'],
+                        symbol=data['symbol'],
+                        tick_direction=data['tickDirection'],
+                        price_24h_pcnt=float(data['price24hPcnt']),
+                        last_price=float(data['lastPrice']),
+                        prev_price_24h=float(data['prevPrice24h']),
+                        high_price_24h=float(data['highPrice24h']),
+                        low_price_24h=float(data['lowPrice24h']),
+                        prev_price_1h=float(data['prevPrice1h']),
+                        mark_price=float(data['markPrice']),
+                        index_price=float(data['indexPrice']),
+                        open_interest=float(data['openInterest']),
+                        open_interest_value=float(data['openInterestValue']),
+                        turnover_24h=float(data['turnover24h']),
+                        volume_24h=float(data['volume24h']),
+                        next_funding_time=int(data['nextFundingTime']),
+                        funding_rate=float(data['fundingRate']),
+                        bid1_price=float(data['bid1Price']),
+                        bid1_size=float(data['bid1Size']),
+                        ask1_price=float(data['ask1Price']),
+                        ask1_size=float(data['ask1Size'])
                     )
-                    self.db_session.add(kline)
+                    ticker_objects.append(ticker)
 
-            self.db_session.commit()
-            logger.debug(f"Saved {len(klines_data)} klines for {symbol}")
-        except Exception as e:
-            self.db_session.rollback()
-            logger.exception(f"Error saving kline data: {e}")
+                db.bulk_save_objects(ticker_objects)
+                db.commit()
 
-    def _process_ticker(self, ticker_data: Dict[str, Any]):
-        """Process ticker data."""
-        try:
-            # Parse ticker data and append it to local memory and at some period of time save it to the database asynchronously
-            self.ticker_data.append(ticker_data)
-            if len(self.ticker_data) > 100:
-                self.save_ticker_data()
-        except Exception as e:
-            logger.exception(f"Error saving ticker data: {e}")
+                # Check database size after saving
+                self.db_size_checker.check_db_size()
 
-    def save_ticker_data(self):
-        """Save ticker data to the database."""
-        try:
-            # Save ticker data to the database
-            self.db_session.bulk_insert_mappings(TickerData, self.ticker_data)
-            self.db_session.commit()
-            self.ticker_data = []
+            except Exception as e:
+                logger.error(f"Error saving ticker data: {e}")
+                db.rollback()
+            finally:
+                db.close()
+
         except Exception as e:
-            self.db_session.rollback()
-            logger.exception(f"Error saving ticker data: {e}")
+            logger.error(f"Error getting database session: {e}")
+        finally:
+            end_time = time.time()
+            execution_time = end_time - start_time
+            logger.info(f"Database save execution time: {execution_time:.4f} seconds for {len(data_to_save)} records")
