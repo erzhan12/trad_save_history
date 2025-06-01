@@ -2,7 +2,6 @@ import signal
 import sys
 import time
 
-# from contextlib import contextmanager
 # from sqlalchemy.orm import Session
 from db.database import Base, engine
 from services.data_processor import DataProcessor

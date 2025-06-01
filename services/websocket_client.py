@@ -1,25 +1,10 @@
 import logging
-
-# import json
 from datetime import datetime
 from typing import Any, Callable, Dict
 
 from pybit.unified_trading import WebSocket
 
 from config.settings import API_KEY, API_SECRET, SYMBOLS, TESTNET, TICKER_BATCH_SIZE
-
-# import time
-# from models.market_data import TickerData
-# from sqlalchemy.orm import Session
-# from datetime import datetime
-# from db.database import get_db, engine
-# import asyncio
-# import threading
-# from queue import Queue
-# from concurrent.futures import ThreadPoolExecutor
-# import os
-# from config.settings import DATABASE_URL
-# from sqlalchemy import text
 from services.data_processor import DataProcessor
 
 logger = logging.getLogger("bybit_collector.websocket")
@@ -32,11 +17,6 @@ class BybitWebSocketClient:
         self.ws_public = None
         self.ws_private = None
         self.subscriptions = []
-        # self.save_queue = Queue()
-        # self.executor = ThreadPoolExecutor(max_workers=1)
-        # self.save_thread = None
-        # self.db_size_checker = DBSizeChecker()
-        # self._start_save_thread()
         self.data_processor = DataProcessor()
 
     def connect_public(self):

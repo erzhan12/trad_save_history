@@ -1,4 +1,3 @@
-# from datetime import datetime
 from sqlalchemy import BigInteger, Column, DateTime, Float, Integer, String
 from sqlalchemy.sql import func
 

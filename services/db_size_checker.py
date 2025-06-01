@@ -6,8 +6,6 @@ from sqlalchemy import text
 from config.settings import DATABASE_URL, DB_SIZE_CHECK_INTERVAL
 from db.database import engine
 
-# from typing import Optional
-
 logger = logging.getLogger("bybit_collector.db_size_checker")
 
 

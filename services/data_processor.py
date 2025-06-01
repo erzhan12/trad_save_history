@@ -1,6 +1,4 @@
 import logging
-
-# from sqlalchemy.orm import sessionmaker
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -8,7 +6,6 @@ from queue import Queue
 
 from db.database import get_db
 
-# from datetime import datetime
 # from typing import Dict, Any
 # from sqlalchemy.orm import Session
 from models.market_data import TickerData

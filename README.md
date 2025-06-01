@@ -3,6 +3,11 @@
 
 A Python application that collects real-time market data from Bybit's WebSocket API and stores it in a SQLite database using SQLAlchemy.
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=erzhan12_trad_save_history&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=erzhan12_trad_save_history)
+
+[![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=erzhan12_trad_save_history)](https://sonarcloud.io/summary/new_code?id=erzhan12_trad_save_history)
+
+[![SonarQube Cloud](https://sonarcloud.io/images/project_badges/sonarcloud-light.svg)](https://sonarcloud.io/summary/new_code?id=erzhan12_trad_save_history)
 ## Features
 
 - Connects to Bybit WebSocket API using pybit.unified_trading

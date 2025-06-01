@@ -9,31 +9,27 @@ from config.settings import DATABASE_URL, DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT
 def get_db_connection():
     """
     Get a database connection based on DB_TYPE.
-    Returns a connection object and a boolean indicating 
-    if it's a SQLite connection.
+    Returns a connection object.
     """
     if DB_TYPE == "sqlite":
         db_path = DATABASE_URL.replace('sqlite:///', '')
-        conn = sqlite3.connect(db_path)
-        return conn, True
+        return sqlite3.connect(db_path)
     elif DB_TYPE == "postgresql":
-        conn = psycopg2.connect(
+        return psycopg2.connect(
             host=DB_HOST,
             port=DB_PORT,
             database=DB_NAME,
             user=DB_USER,
             password=DB_PASSWORD
         )
-        return conn, False
     elif DB_TYPE == "mysql":
-        conn = mysql.connector.connect(
+        return mysql.connector.connect(
             host=DB_HOST,
             port=DB_PORT,
             database=DB_NAME,
             user=DB_USER,
             password=DB_PASSWORD
         )
-        return conn, False
     else:
         raise ValueError(f"Unsupported database type: {DB_TYPE}")
 
@@ -43,7 +39,7 @@ def execute_query(query, params=None):
     Execute a query and return results.
     Handles both SQLite and other database types.
     """
-    conn, is_sqlite = get_db_connection()
+    conn = get_db_connection()
     try:
         cursor = conn.cursor()
         if params:
@@ -68,7 +64,7 @@ def check_db_connection():
     Test database connection and return status.
     """
     try:
-        conn, is_sqlite = get_db_connection()
+        conn = get_db_connection()
         conn.close()
         return True, f"Successfully connected to {DB_TYPE} database"
     except Exception as e:
@@ -80,7 +76,7 @@ def get_db_size():
     Get database size based on database type.
     """
     if DB_TYPE == "sqlite":
-        conn, _ = get_db_connection()
+        conn = get_db_connection()
         try:
             cursor = conn.cursor()
             cursor.execute(
@@ -93,7 +89,7 @@ def get_db_size():
         finally:
             conn.close()
     elif DB_TYPE == "postgresql":
-        conn, _ = get_db_connection()
+        conn = get_db_connection()
         try:
             cursor = conn.cursor()
             cursor.execute("SELECT pg_database_size(current_database())")
@@ -101,7 +97,7 @@ def get_db_size():
         finally:
             conn.close()
     elif DB_TYPE == "mysql":
-        conn, _ = get_db_connection()
+        conn = get_db_connection()
         try:
             cursor = conn.cursor()
             cursor.execute("""
