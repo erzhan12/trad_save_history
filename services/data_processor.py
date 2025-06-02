@@ -5,9 +5,6 @@ from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
 
 from db.database import get_db
-
-# from typing import Dict, Any
-# from sqlalchemy.orm import Session
 from models.market_data import TickerData
 from services.db_size_checker import DBSizeChecker
 
@@ -16,21 +13,24 @@ logger = logging.getLogger("bybit_collector.processor")
 
 class DataProcessor:
     def __init__(self):
-        self.save_thread = None
-        self.save_queue = Queue()
-        self.db_size_checker = DBSizeChecker()
-        self.executor = ThreadPoolExecutor(max_workers=1)
+        self._save_thread = None
+        self._save_queue = Queue()
+        self._db_size_checker = DBSizeChecker()
+        self._executor = ThreadPoolExecutor(max_workers=1)
         self._start_save_thread()
+
+    def add_to_save_queue(self, data_to_save):
+        self._save_queue.put(data_to_save)
 
     def _start_save_thread(self):
         """Start the save thread."""
-        self.save_thread = threading.Thread(target=self._save_worker, daemon=True)
-        self.save_thread.start()
+        self._save_thread = threading.Thread(target=self._save_worker, daemon=True)
+        self._save_thread.start()
 
     def _save_worker(self):
         """Worker thread that processes save operations."""
         while True:
-            data_to_save = self.save_queue.get()
+            data_to_save = self._save_queue.get()
             if data_to_save is None:  # Shutdown signal
                 break
             try:
@@ -38,14 +38,14 @@ class DataProcessor:
             except Exception as e:
                 logger.error(f"Error in save thread: {e}")
             finally:
-                self.save_queue.task_done()
+                self._save_queue.task_done()
 
     def stop(self):
         # Signal save thread to stop
-        self.save_queue.put(None)
-        if self.save_thread:
-            self.save_thread.join()
-        self.executor.shutdown(wait=True)
+        self._save_queue.put(None)
+        if self._save_thread:
+            self._save_thread.join()
+        self._executor.shutdown(wait=True)
 
     def _save_to_database(self, data_to_save):
         """Save ticker data to database synchronously."""
@@ -85,7 +85,7 @@ class DataProcessor:
                 db.commit()
 
                 # Check database size after saving
-                self.db_size_checker.check_db_size()
+                self._db_size_checker.check_db_size()
 
             except Exception as e:
                 logger.error(f"Error saving ticker data: {e}")

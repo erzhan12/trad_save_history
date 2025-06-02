@@ -2,7 +2,6 @@ import signal
 import sys
 import time
 
-# from sqlalchemy.orm import Session
 from db.database import Base, engine
 from services.data_processor import DataProcessor
 from services.websocket_client import BybitWebSocketClient
@@ -29,8 +28,6 @@ def main():
         logger.info("Initializing database...")
         Base.metadata.create_all(bind=engine)
 
-        # Create database session
-        # with get_db_session() as db_session:
         # Initialize data processor
         data_processor = DataProcessor()
 

@@ -19,6 +19,9 @@ install:
 run:
 	python main.py
 
+lint:
+	ruff check .
+
 # Database check commands
 check-db:
 	python check_db.py --recent 10

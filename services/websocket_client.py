@@ -37,21 +37,15 @@ class BybitWebSocketClient:
             ticker_data = message['data'].copy()  # Create a copy of incoming data
             ticker_data['timestamp'] = datetime.now()
             symbol = ticker_data['symbol']
-            # print(f'handle ticker Last Price: {symbol} 
-            # {ticker_data["lastPrice"]} {ticker_data["turnover24h"]}')
             
             # If this is the first entry, append it
             if not self.ticker_data.get(symbol):
                 self.ticker_data[symbol] = []
                 self.ticker_data[symbol].append(ticker_data)
-                # print(f'First append ticker Last Price: 
-                # {ticker_data["lastPrice"]} {ticker_data["turnover24h"]}')
                 return
 
             # Get the last entry for the symbol
             last_data = self.ticker_data[symbol][-1]
-            # print(f'last_data: {last_data}')
-            # print(f'ticker data size: {len(self.ticker_data)}')
             # Compare all fields except timestamp-related ones
             fields_to_compare = [
                 # 'symbol', 'tickDirection', 'price24hPcnt', 
@@ -62,21 +56,16 @@ class BybitWebSocketClient:
                 # 'turnover24h', 'volume24h', 'nextFundingTime', 'fundingRate',
                 # 'bid1Price', 'bid1Size', 'ask1Price', 'ask1Size'
             ]
-            # print(f'last_data[lastPrice]: {last_data["lastPrice"]}')
-            # print(f'ticker_data[lastPrice]: {ticker_data["lastPrice"]}')
             
             # Check if any field has changed
             has_changes = any(
                 ticker_data[field] != last_data[field]
                 for field in fields_to_compare
             )
-            # print(f'has_changes: {has_changes}')
             
             # Only append if there are changes
             if has_changes:
                 self.ticker_data[symbol].append(ticker_data)  # Append the copy
-                # print(f'Changed handle ticker Last Price: 
-                # {ticker_data["lastPrice"]} {ticker_data["turnover24h"]}')
                 
                 # When the internal table reaches the configured batch size, 
                 # queue for saving
@@ -85,7 +74,7 @@ class BybitWebSocketClient:
                     self.ticker_data[symbol] = []
                     print(f'save to database: {len(data_to_save)}')
                     logger.info(f'save to database: {len(data_to_save)}')
-                    self.data_processor.save_queue.put(data_to_save)
+                    self.data_processor.add_to_save_queue(data_to_save) 
                 
         except KeyError as e:
             print(f"KeyError in handle_ticker: {e}")
