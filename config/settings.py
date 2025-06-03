@@ -25,11 +25,11 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 
 # Construct DATABASE_URL based on DB_TYPE
 if DB_TYPE == "sqlite":
-    DATABASE_URL = f"sqlite:///{DB_NAME}.db"
+    DATABASE_URL = f"sqlite+aiosqlite:///{DB_NAME}.db"
 elif DB_TYPE == "postgresql":
-    DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 elif DB_TYPE == "mysql":
-    DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    DATABASE_URL = f"mysql+aiomysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 else:
     raise ValueError(f"Unsupported database type: {DB_TYPE}")
 

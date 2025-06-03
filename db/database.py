@@ -1,22 +1,20 @@
-from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
-from sqlalchemy.pool import QueuePool
 
 from config.settings import DATABASE_URL, ECHO_SQL
 
 # Configure engine with connection pooling
-engine = create_engine(
+engine = create_async_engine(
     DATABASE_URL,
     echo=ECHO_SQL,
-    poolclass=QueuePool,
-    pool_size=5,
-    max_overflow=10,
-    pool_timeout=30,
-    pool_recycle=1800,  # Recycle connections after 30 minutes
 )
 
 # Create sessionmaker
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
 
 
 # Create Base class for models
@@ -25,9 +23,6 @@ class Base(DeclarativeBase):
 
 
 # Function to get a database session
-def get_db():
-    db = SessionLocal()
-    try:
+async def get_db():
+    async with SessionLocal() as db:
         yield db
-    finally:
-        db.close()

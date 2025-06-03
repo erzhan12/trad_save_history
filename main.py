@@ -1,3 +1,4 @@
+import asyncio
 import signal
 import sys
 import time
@@ -19,25 +20,27 @@ def cleanup(ws_client):
     logger.info("Application stopped")
 
 
-def main():
+async def main():
     """Main application entry point."""
     ws_client = None
 
     try:
         # Create database tables if they don't exist
         logger.info("Initializing database...")
-        Base.metadata.create_all(bind=engine)
+        # Base.metadata.create_all(bind=engine)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
         # Initialize data processor
         data_processor = DataProcessor()
 
         # Define message handler
-        def handle_ws_message(channel_type, message):
-            data_processor.process_message(channel_type, message)
+        async def handle_save(data_to_save):
+            await data_processor.add_to_save_queue(data_to_save)
 
         # Initialize WebSocket client
         logger.info("Initializing WebSocket client...")
-        ws_client = BybitWebSocketClient(handle_ws_message)
+        ws_client = BybitWebSocketClient(handle_save)
 
         # Set up signal handlers for graceful shutdown
         def signal_handler(sig, frame):
@@ -50,7 +53,7 @@ def main():
 
         # Connect to WebSocket
         logger.info("Connecting to Bybit WebSocket API...")
-        ws_client.connect_public()
+        await ws_client.connect_public()
 
         # Keep the process running
         logger.info("Application started successfully. Press Ctrl+C to exit.")
@@ -64,4 +67,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

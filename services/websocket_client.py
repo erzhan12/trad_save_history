@@ -5,21 +5,22 @@ from typing import Any, Callable, Dict
 from pybit.unified_trading import WebSocket
 
 from config.settings import API_KEY, API_SECRET, SYMBOLS, TESTNET, TICKER_BATCH_SIZE
+
 from services.data_processor import DataProcessor
 
 logger = logging.getLogger("bybit_collector.websocket")
 
 
 class BybitWebSocketClient:
-    def __init__(self, message_handler: Callable[[str, Dict[str, Any]], None]):
+    def __init__(self, save_handler: Callable[[Dict[str, Any]], None]):
         self.ticker_data = {}
-        self.message_handler = message_handler
         self.ws_public = None
         self.ws_private = None
         self.subscriptions = []
         self.data_processor = DataProcessor()
+        self.save_handler = save_handler
 
-    def connect_public(self):
+    async def connect_public(self):
         """Connect to Bybit WebSocket API and subscribe to channels."""
         try:
             self.ws_public = WebSocket(
@@ -32,7 +33,7 @@ class BybitWebSocketClient:
             logger.exception(f"Failed to connect to WebSocket: {e}")
             raise
 
-    def handle_ticker(self, message):
+    async def handle_ticker(self, message):
         try:
             ticker_data = message['data'].copy()  # Create a copy of incoming data
             ticker_data['timestamp'] = datetime.now()
@@ -74,21 +75,18 @@ class BybitWebSocketClient:
                     self.ticker_data[symbol] = []
                     print(f'save to database: {len(data_to_save)}')
                     logger.info(f'save to database: {len(data_to_save)}')
-                    self.data_processor.add_to_save_queue(data_to_save) 
+                    # self.save_handler(data_to_save)
+                    await self.data_processor.add_to_save_queue(data_to_save)
                 
         except KeyError as e:
             print(f"KeyError in handle_ticker: {e}")
 
-    def connect_private(self):
+    async def connect_private(self):
         """Connect to Bybit WebSocket API and subscribe to channels."""
         try:
-            # Initialize WebSocket client
-            # ws_url = "wss://stream-testnet.bybit.com/v5" if TESTNET else "wss://stream.bybit.com/v5"
-            
             ws_options = {
                 "api_key": API_KEY,
                 "api_secret": API_SECRET,
-                # "channel_type": "private" if WS_PRIVATE else "public",
                 "channel_type": "linear",
                 "test": TESTNET,
                 "logging_level": logging.DEBUG,
@@ -99,12 +97,6 @@ class BybitWebSocketClient:
                 callback=self._handle_message
             )
             
-            # Generate subscription topics
-            # self.subscriptions = self._generate_subscriptions()
-            
-            # Log subscriptions
-            # logger.info(f"Subscribing to: {self.subscriptions}")
-            
             # Subscribe to topics
             self.ws_private.subscribe(self.subscriptions)
             
@@ -114,8 +106,8 @@ class BybitWebSocketClient:
             logger.exception(f"Failed to connect to WebSocket: {e}")
             raise
             
-    def disconnect(self):
-        """Disconnect from WebSocket API and cleanup threads."""
+    async def disconnect(self):
+        """Disconnect from WebSocket API and cleanup resources."""
         if self.ws_private:
             try:
                 self.ws_private.exit()
@@ -124,4 +116,4 @@ class BybitWebSocketClient:
                 logger.error(f"Error disconnecting from WebSocket: {e}")
         
         # Signal save thread to stop
-        self.data_processor.stop()
+        await self.data_processor.stop()
