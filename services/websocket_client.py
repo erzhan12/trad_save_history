@@ -1,24 +1,28 @@
+import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Callable, Dict
 
 from pybit.unified_trading import WebSocket
 
 from config.settings import API_KEY, API_SECRET, SYMBOLS, TESTNET, TICKER_BATCH_SIZE
-
 from services.data_processor import DataProcessor
 
 logger = logging.getLogger("bybit_collector.websocket")
 
 
 class BybitWebSocketClient:
-    def __init__(self, save_handler: Callable[[Dict[str, Any]], None]):
+    def __init__(self, data_processor: DataProcessor):
         self.ticker_data = {}
         self.ws_public = None
         self.ws_private = None
         self.subscriptions = []
-        self.data_processor = DataProcessor()
-        self.save_handler = save_handler
+        self.data_processor = data_processor
+        # self.save_handler = save_handler
+
+    def sync_handle_ticker(self, message):
+        # loop = asyncio.get_event_loop()
+        # loop.run_until_complete(self.handle_ticker(message))
+        asyncio.run(self.handle_ticker(message))
 
     async def connect_public(self):
         """Connect to Bybit WebSocket API and subscribe to channels."""
@@ -28,7 +32,7 @@ class BybitWebSocketClient:
                 channel_type='linear'
             )
             for symbol in SYMBOLS:  # Subscribe to all symbols
-                self.ws_public.ticker_stream(symbol, self.handle_ticker)
+                self.ws_public.ticker_stream(symbol, self.sync_handle_ticker)
         except Exception as e:
             logger.exception(f"Failed to connect to WebSocket: {e}")
             raise
@@ -76,7 +80,7 @@ class BybitWebSocketClient:
                     print(f'save to database: {len(data_to_save)}')
                     logger.info(f'save to database: {len(data_to_save)}')
                     # self.save_handler(data_to_save)
-                    await self.data_processor.add_to_save_queue(data_to_save)
+                    await self.data_processor.save_to_database(data_to_save)
                 
         except KeyError as e:
             print(f"KeyError in handle_ticker: {e}")
@@ -116,4 +120,4 @@ class BybitWebSocketClient:
                 logger.error(f"Error disconnecting from WebSocket: {e}")
         
         # Signal save thread to stop
-        await self.data_processor.stop()
+        # await self.data_processor.stop()

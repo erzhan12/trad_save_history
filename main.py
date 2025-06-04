@@ -35,12 +35,12 @@ async def main():
         data_processor = DataProcessor()
 
         # Define message handler
-        async def handle_save(data_to_save):
-            await data_processor.add_to_save_queue(data_to_save)
+        # async def handle_save(data_to_save):
+        #     await data_processor.save_to_database(data_to_save)
 
         # Initialize WebSocket client
         logger.info("Initializing WebSocket client...")
-        ws_client = BybitWebSocketClient(handle_save)
+        ws_client = BybitWebSocketClient(data_processor)
 
         # Set up signal handlers for graceful shutdown
         def signal_handler(sig, frame):

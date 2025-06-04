@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import time
 
@@ -6,6 +5,7 @@ from sqlalchemy import insert
 
 from db.database import SessionLocal
 from models.market_data import TickerData
+
 # from services.db_size_checker import DBSizeChecker
 
 logger = logging.getLogger("bybit_collector.processor")
@@ -13,30 +13,31 @@ logger = logging.getLogger("bybit_collector.processor")
 
 class DataProcessor:
     def __init__(self):
-        self.save_queue = asyncio.Queue()
+        # self.save_queue = asyncio.Queue()
         # self.db_size_checker = DBSizeChecker()
-        asyncio.create_task(self._save_worker())
+        # asyncio.create_task(self._save_worker())
+        pass
 
-    async def add_to_save_queue(self, data_to_save):
-        await self.save_queue.put(data_to_save)
+    # async def add_to_save_queue(self, data_to_save):
+    #     await self.save_queue.put(data_to_save)
 
-    async def _save_worker(self):
-        """Worker that processes save operations."""
-        while True:
-            data_to_save = await self.save_queue.get()
-            if data_to_save is None:  # Shutdown signal
-                break
-            try:
-                await self._save_to_database(data_to_save)
-            except Exception as e:
-                logger.error(f"Error in save worker: {e}")
-            finally:
-                self.save_queue.task_done()
+    # async def _save_worker(self):
+    #     """Worker that processes save operations."""
+    #     while True:
+    #         data_to_save = await self.save_queue.get()
+    #         if data_to_save is None:  # Shutdown signal
+    #             break
+    #         try:
+    #             await self.save_to_database(data_to_save)
+    #         except Exception as e:
+    #             logger.error(f"Error in save worker: {e}")
+    #         finally:
+    #             self.save_queue.task_done()
 
-    async def stop(self):
-        # Signal save worker to stop
-        await self.save_queue.put(None)
-        await self.save_queue.join()
+    # async def stop(self):
+    #     # Signal save worker to stop
+    #     await self.save_queue.put(None)
+    #     await self.save_queue.join()
 
     def get_ticker_objects(self, data_to_save):
         ticker_objects = []
@@ -67,7 +68,7 @@ class DataProcessor:
             ticker_objects.append(ticker)
         return ticker_objects
 
-    async def _save_to_database(self, data_to_save):
+    async def save_to_database(self, data_to_save):
         """Save ticker data to database synchronously."""
         start_time = time.time()
         try:
