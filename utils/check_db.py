@@ -3,7 +3,7 @@ import argparse
 import pandas as pd
 from tabulate import tabulate
 
-from utils.db_connect import get_db_connection
+from .db_connect import get_db_connection
 
 
 def get_table_names(conn):
@@ -81,7 +81,7 @@ def main():
     args = parser.parse_args()
     
     try:
-        conn, _ = get_db_connection()
+        conn = get_db_connection()
         
         if args.tables:
             tables = get_table_names(conn)

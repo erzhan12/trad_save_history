@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    image: uvproduction
+    container_name: bybit-data-collector
+    environment:
+      - DB_TYPE=postgresql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=bybit_data
+      - DB_USER=postgres
+      - DB_PASSWORD=BybitSecure2024!
+      - BYBIT_API_KEY=${BYBIT_API_KEY}
+      - BYBIT_API_SECRET=${BYBIT_API_SECRET}
+    depends_on:
+      - postgres
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15
+    container_name: bybit-postgres
+    environment:
+      - POSTGRES_DB=bybit_data
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=BybitSecure2024!
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "15432:5432"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local

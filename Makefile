@@ -24,19 +24,19 @@ lint:
 
 # Database check commands
 check-db:
-	python check_db.py --recent 10
+	python check_db_runner.py --recent 10
 
 check-tables:
-	python check_db.py --tables
+	python check_db_runner.py --tables
 
 check-stats:
-	python check_db.py --stats
+	python check_db_runner.py --stats
 
 check-recent:
-	python check_db.py --recent 20
+	python check_db_runner.py --recent 20
 
 check-symbol:
-	python check_db.py --recent 20 --symbol BTCUSDT
+	python check_db_runner.py --recent 20 --symbol BTCUSDT
 
 # Clean up
 clean:

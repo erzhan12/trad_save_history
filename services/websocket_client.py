@@ -65,6 +65,7 @@ class BybitWebSocketClient:
             
             # Only append if there are changes
             if has_changes:
+                print(f'has changes: {ticker_data["lastPrice"]}')
                 self.ticker_data[symbol].append(ticker_data)  # Append the copy
                 
                 # When the internal table reaches the configured batch size, 

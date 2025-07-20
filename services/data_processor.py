@@ -18,43 +18,63 @@ class DataProcessor:
         self._db_size_checker = DBSizeChecker()
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._start_save_thread()
+        logger.info("DataProcessor initialized with save thread and queue")
 
     def add_to_save_queue(self, data_to_save):
+        """Add data to the save queue."""
+        logger.info(f"Adding {len(data_to_save)} records to save queue")
         self._save_queue.put(data_to_save)
+        logger.debug(f"Current queue size: {self._save_queue.qsize()}")
 
     def _start_save_thread(self):
         """Start the save thread."""
+        logger.info("Starting save thread")
         self._save_thread = threading.Thread(target=self._save_worker, daemon=True)
         self._save_thread.start()
+        logger.info("Save thread started successfully")
 
     def _save_worker(self):
         """Worker thread that processes save operations."""
+        logger.info("Save worker thread started")
         while True:
+            logger.debug("Waiting for data in save queue...")
             data_to_save = self._save_queue.get()
             if data_to_save is None:  # Shutdown signal
+                logger.info("Received shutdown signal in save worker")
                 break
             try:
+                logger.info(f"Processing batch of {len(data_to_save)} records")
                 self._save_to_database(data_to_save)
+                logger.info(f"Successfully processed batch of {len(data_to_save)} records")
             except Exception as e:
-                logger.error(f"Error in save thread: {e}")
+                logger.error(f"Error in save thread: {e}", exc_info=True)
             finally:
                 self._save_queue.task_done()
+                logger.debug("Task marked as done in save queue")
 
     def stop(self):
+        """Stop the data processor and cleanup resources."""
+        logger.info("Stopping DataProcessor...")
         # Signal save thread to stop
         self._save_queue.put(None)
         if self._save_thread:
+            logger.info("Waiting for save thread to finish...")
             self._save_thread.join()
+            logger.info("Save thread stopped")
         self._executor.shutdown(wait=True)
+        logger.info("DataProcessor stopped successfully")
 
     def _save_to_database(self, data_to_save):
         """Save ticker data to database synchronously."""
         start_time = time.time()
+        logger.info(f"Starting database save operation for {len(data_to_save)} records")
         try:
             # Get a database session from the generator
+            logger.debug("Getting database session")
             db = next(get_db())
             try:
                 ticker_objects = []
+                logger.debug("Creating ticker objects")
                 for data in data_to_save:
                     ticker = TickerData(
                         timestamp=data['timestamp'],
@@ -80,23 +100,32 @@ class DataProcessor:
                         ask1_size=float(data['ask1Size'])
                     )
                     ticker_objects.append(ticker)
+                logger.debug(f"Created {len(ticker_objects)} ticker objects")
 
+                logger.info("Performing bulk save operation")
                 db.bulk_save_objects(ticker_objects)
+                logger.debug("Committing transaction")
                 db.commit()
+                logger.info("Successfully committed transaction")
 
                 # Check database size after saving
+                logger.debug("Checking database size")
                 self._db_size_checker.check_db_size()
 
             except Exception as e:
-                logger.error(f"Error saving ticker data: {e}")
+                logger.error(f"Error saving ticker data: {e}", exc_info=True)
+                logger.info("Rolling back transaction")
                 db.rollback()
+                raise
             finally:
+                logger.debug("Closing database session")
                 db.close()
 
         except Exception as e:
-            logger.error(f"Error getting database session: {e}")
+            logger.error(f"Error getting database session: {e}", exc_info=True)
+            raise
         finally:
             end_time = time.time()
             execution_time = end_time - start_time
-            logger.info(f"Database save execution time: {execution_time:.4f} seconds "
+            logger.info(f"Database save operation completed in {execution_time:.4f} seconds "
                         f"for {len(data_to_save)} records")
