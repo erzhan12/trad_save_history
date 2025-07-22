@@ -61,6 +61,8 @@ class DataProcessor:
             logger.info("Waiting for save thread to finish...")
             self._save_thread.join()
             logger.info("Save thread stopped")
+        # Wait for all queued items to be processed
+        self._save_queue.join()
         self._executor.shutdown(wait=True)
         logger.info("DataProcessor stopped successfully")
 
@@ -71,7 +73,11 @@ class DataProcessor:
         try:
             # Get a database session from the generator
             logger.debug("Getting database session")
-            db = next(get_db())
+            try:
+                db = next(get_db())
+            except StopIteration:
+                logger.error("Failed to get database session: generator exhausted")
+                raise RuntimeError("Database session generator exhausted")
             try:
                 ticker_objects = []
                 logger.debug("Creating ticker objects")
