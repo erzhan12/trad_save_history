@@ -1,13 +1,14 @@
 import importlib
-import os
+import sys
 from datetime import datetime, timezone
-from time import sleep
+from pathlib import Path
 
 import pytest
 
 
 @pytest.fixture()
 def processor(tmp_path, monkeypatch):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     db_path = tmp_path / "test_db"
     monkeypatch.setenv("DB_TYPE", "sqlite")
     monkeypatch.setenv("DB_NAME", str(db_path))
@@ -16,8 +17,8 @@ def processor(tmp_path, monkeypatch):
     import config.settings as settings
     import db.database as database
     import models.market_data as market_data
-    import services.db_size_checker as db_size_checker
     import services.data_processor as data_processor
+    import services.db_size_checker as db_size_checker
 
     importlib.reload(settings)
     importlib.reload(database)
@@ -31,6 +32,7 @@ def processor(tmp_path, monkeypatch):
     yield proc
     proc.stop()
     database.Base.metadata.drop_all(bind=database.engine)
+
 
 def make_sample_data():
     now = datetime.now(timezone.utc)
