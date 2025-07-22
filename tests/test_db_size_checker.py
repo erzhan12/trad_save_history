@@ -41,27 +41,24 @@ def test_get_db_size_selects_helper(monkeypatch, db_url, expected):
     monkeypatch.setattr(db_size_checker, "DATABASE_URL", db_url)
 
     def fake_sqlite(self):
-        return 123.0
+        return expected
 
     def fake_postgres(self):
-        return 456.0
+        return expected
 
     monkeypatch.setattr(db_size_checker.DBSizeChecker, "_get_sqlite_size", fake_sqlite)
     monkeypatch.setattr(db_size_checker.DBSizeChecker, "_get_postgresql_size", fake_postgres)
 
-    checker = db_size_checker.DBSizeChecker.__new__(db_size_checker.DBSizeChecker)
+    checker = db_size_checker.DBSizeChecker()
     result = checker._get_db_size()
-    if db_url.startswith("sqlite"):
-        assert result == pytest.approx(123)
-    else:
-        assert result == pytest.approx(456)
+    assert result == pytest.approx(expected)
 
 
 def test_sqlite_size(monkeypatch):
     dummy_conn = DummyConnection(111)
     monkeypatch.setattr(db_size_checker.engine, "connect", lambda: dummy_conn)
 
-    checker = db_size_checker.DBSizeChecker.__new__(db_size_checker.DBSizeChecker)
+    checker = db_size_checker.DBSizeChecker()
     assert checker._get_sqlite_size() == pytest.approx(111)
 
 
@@ -69,7 +66,7 @@ def test_postgresql_size(monkeypatch):
     dummy_conn = DummyConnection(222)
     monkeypatch.setattr(db_size_checker.engine, "connect", lambda: dummy_conn)
 
-    checker = db_size_checker.DBSizeChecker.__new__(db_size_checker.DBSizeChecker)
+    checker = db_size_checker.DBSizeChecker()
     assert checker._get_postgresql_size() == pytest.approx(222)
 
 
