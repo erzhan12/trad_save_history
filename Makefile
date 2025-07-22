@@ -1,9 +1,10 @@
-.PHONY: help install check-db check-tables check-stats check-recent check-symbol clean
+.PHONY: help install test check-db check-tables check-stats check-recent check-symbol clean
 
 # Default target
 help:
 	@echo "Available commands:"
 	@echo "  make install        - Install project dependencies"
+	@echo "  make test           - Run pytest tests"
 	@echo "  make check-db       - Show recent ticker data (default 10 records)"
 	@echo "  make check-tables   - List all database tables"
 	@echo "  make check-stats    - Show ticker statistics"
@@ -14,6 +15,10 @@ help:
 # Install dependencies
 install:
 	pip install -e .
+
+# Run tests
+test:
+	pytest
 
 # Run the application
 run:
