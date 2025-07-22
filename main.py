@@ -3,7 +3,6 @@ import sys
 import time
 
 from db.database import Base, engine
-from services.data_processor import DataProcessor
 from services.websocket_client import BybitWebSocketClient
 from utils.logging_config import setup_logging
 
@@ -28,16 +27,9 @@ def main():
         logger.info("Initializing database...")
         Base.metadata.create_all(bind=engine)
 
-        # Initialize data processor
-        data_processor = DataProcessor()
-
-        # Define message handler
-        def handle_ws_message(channel_type, message):
-            data_processor.process_message(channel_type, message)
-
         # Initialize WebSocket client
         logger.info("Initializing WebSocket client...")
-        ws_client = BybitWebSocketClient(handle_ws_message)
+        ws_client = BybitWebSocketClient()
 
         # Set up signal handlers for graceful shutdown
         def signal_handler(sig, frame):
