@@ -76,7 +76,7 @@ def test_postgresql_size(monkeypatch):
 def test_check_db_size_logging(monkeypatch):
     monkeypatch.setattr(db_size_checker, "DB_SIZE_CHECK_INTERVAL", 1)
 
-    times = iter([0, 0, 0.5, 2])
+    times = iter([0, 0, 0.5, 1.5, 2.5])
     monkeypatch.setattr(db_size_checker.time, "time", lambda: next(times))
 
     get_calls = []
