@@ -5,6 +5,9 @@ from pathlib import Path
 
 import pytest
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+pytest.importorskip("sqlalchemy")
+
 
 @pytest.fixture()
 def processor(tmp_path, monkeypatch):
