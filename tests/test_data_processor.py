@@ -1,9 +1,20 @@
 import importlib
 import os
+import sys
+from pathlib import Path
 from datetime import datetime, timezone
 from time import sleep
 
+# Ensure project root is on sys.path for module resolution
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import types
+sys.modules.setdefault('dotenv', types.SimpleNamespace(load_dotenv=lambda *a, **k: None))
+
+import importlib.util
 import pytest
+
+if importlib.util.find_spec("sqlalchemy") is None:
+    pytest.skip("sqlalchemy not available", allow_module_level=True)
 
 
 @pytest.fixture()
