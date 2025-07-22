@@ -1,6 +1,6 @@
 import importlib
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from time import sleep
 
 import pytest
@@ -32,12 +32,8 @@ def processor(tmp_path, monkeypatch):
     proc.stop()
     database.Base.metadata.drop_all(bind=database.engine)
 
-from db.database import SessionLocal
-from models.market_data import TickerData
-
-
 def make_sample_data():
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return [
         {
             'timestamp': now,
@@ -89,6 +85,9 @@ def make_sample_data():
 
 
 def test_add_to_save_queue_and_persistence(processor):
+    from db.database import SessionLocal
+    from models.market_data import TickerData
+    
     sample_data = make_sample_data()
     processor.add_to_save_queue(sample_data)
 
