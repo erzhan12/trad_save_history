@@ -64,7 +64,7 @@ class BybitWebSocketClient:
             
             # Only append if there are changes
             if has_changes:
-                print(f'has changes: {ticker_data["lastPrice"]}')
+                # print(f'has changes: {ticker_data["lastPrice"]}')
                 self.ticker_data[symbol].append(ticker_data)  # Append the copy
                 
                 # When the internal table reaches the configured batch size, 
@@ -72,7 +72,7 @@ class BybitWebSocketClient:
                 if len(self.ticker_data[symbol]) >= TICKER_BATCH_SIZE:
                     data_to_save = self.ticker_data[symbol].copy()
                     self.ticker_data[symbol] = []
-                    print(f'save to database: {len(data_to_save)}')
+                    # print(f'save to database: {len(data_to_save)}')
                     logger.info(f'save to database: {len(data_to_save)}')
                     self.data_processor.add_to_save_queue(data_to_save) 
                 
@@ -88,7 +88,6 @@ class BybitWebSocketClient:
             ws_options = {
                 "api_key": API_KEY,
                 "api_secret": API_SECRET,
-                # "channel_type": "private" if WS_PRIVATE else "public",
                 "channel_type": "linear",
                 "test": TESTNET,
                 "logging_level": logging.DEBUG,
