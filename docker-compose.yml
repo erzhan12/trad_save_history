@@ -3,17 +3,25 @@ version: '3.8'
 services:
   app:
     build: .
-    image: uvproduction
+    image: bybit-data-collector-image
     container_name: bybit-data-collector
     environment:
-      - DB_TYPE=postgresql
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
-      - DB_NAME=${DB_NAME}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - BYBIT_API_KEY=${BYBIT_API_KEY}
-      - BYBIT_API_SECRET=${BYBIT_API_SECRET}
+      - DB_TYPE=${DB_TYPE:-postgresql}
+      - DB_HOST=${DB_HOST:-localhost}
+      - DB_PORT=${DB_PORT:-}
+      - DB_NAME=${DB_NAME:-bybit_data}
+      - DB_USER=${DB_USER:-}
+      - DB_PASSWORD=${DB_PASSWORD:-}
+      - BYBIT_API_KEY=${BYBIT_API_KEY:-}
+      - BYBIT_API_SECRET=${BYBIT_API_SECRET:-}
+      - USE_TESTNET=${USE_TESTNET:-False}
+      - WS_PRIVATE=${WS_PRIVATE:-False}
+      - SYMBOLS=${SYMBOLS:-BTCUSDT,ETHUSDT,LTCUSDT,SOLUSDT}
+      - CHANNELS=${CHANNELS:-orderbook.50,trade,kline.1m}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DATA_RETENTION_DAYS=${DATA_RETENTION_DAYS:-30}
+      - TICKER_BATCH_SIZE=${TICKER_BATCH_SIZE:-100}
+      - DB_SIZE_CHECK_INTERVAL=${DB_SIZE_CHECK_INTERVAL:-30}
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data

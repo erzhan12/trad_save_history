@@ -16,7 +16,7 @@ SYMBOLS = os.getenv("SYMBOLS", "BTCUSDT,ETHUSDT,LTCUSDT,SOLUSDT").split(",")
 CHANNELS = os.getenv("CHANNELS", "orderbook.50,trade,kline.1m").split(",")
 
 # Database Configuration
-DB_TYPE = os.getenv("DB_TYPE", "sqlite").lower()
+DB_TYPE = os.getenv("DB_TYPE", "postgresql").lower()
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "")
 DB_NAME = os.getenv("DB_NAME", "bybit_data")
