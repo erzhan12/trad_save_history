@@ -41,6 +41,7 @@ class DataProcessor:
             data_to_save = self._save_queue.get()
             if data_to_save is None:  # Shutdown signal
                 logger.info("Received shutdown signal in save worker")
+                self._save_queue.task_done()  # Mark the None signal as done
                 break
             try:
                 logger.info(f"Processing batch of {len(data_to_save)} records")
@@ -56,13 +57,14 @@ class DataProcessor:
         """Stop the data processor and cleanup resources."""
         logger.info("Stopping DataProcessor...")
         
-        # Wait for any remaining data in the queue to be processed
-        if not self._save_queue.empty():
-            logger.info("Waiting for remaining data in queue to be processed...")
-            self._save_queue.join()
-        
-        # Signal save thread to stop
+        # Signal save thread to stop first
         self._save_queue.put(None)
+        
+        # Wait for any remaining data in the queue to be processed
+        # Call join() unconditionally to ensure all tasks are processed
+        logger.info("Waiting for remaining data in queue to be processed...")
+        self._save_queue.join()
+        
         if self._save_thread:
             logger.info("Waiting for save thread to finish...")
             self._save_thread.join()
