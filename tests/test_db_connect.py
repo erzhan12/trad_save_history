@@ -5,9 +5,8 @@ import types
 
 import pytest
 
-# Ensure project root on path and stub dotenv
+# Ensure project root on path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-sys.modules.setdefault('dotenv', types.SimpleNamespace(load_dotenv=lambda *a, **k: None))
 
 
 def reload_modules(monkeypatch, **env):
@@ -161,3 +160,10 @@ def test_get_db_size_mysql(monkeypatch):
     executed_query, params = dummy.cursor_obj.executed[0]
     assert "information_schema.tables" in executed_query
     assert params == ("db",)
+
+
+def test_get_db_size_invalid(monkeypatch):
+    db_connect = reload_modules(monkeypatch, DB_TYPE="sqlite")
+    db_connect.DB_TYPE = "oracle"
+    with pytest.raises(ValueError):
+        db_connect.get_db_size()

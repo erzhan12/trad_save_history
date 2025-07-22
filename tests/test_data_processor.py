@@ -1,24 +1,17 @@
 import importlib
-import os
 import sys
-from pathlib import Path
 from datetime import datetime, timezone
-from time import sleep
+from pathlib import Path
 
-# Ensure project root is on sys.path for module resolution
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import types
-sys.modules.setdefault('dotenv', types.SimpleNamespace(load_dotenv=lambda *a, **k: None))
-
-import importlib.util
 import pytest
 
-if importlib.util.find_spec("sqlalchemy") is None:
-    pytest.skip("sqlalchemy not available", allow_module_level=True)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+pytest.importorskip("sqlalchemy")
 
 
 @pytest.fixture()
 def processor(tmp_path, monkeypatch):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     db_path = tmp_path / "test_db"
     monkeypatch.setenv("DB_TYPE", "sqlite")
     monkeypatch.setenv("DB_NAME", str(db_path))
@@ -27,8 +20,8 @@ def processor(tmp_path, monkeypatch):
     import config.settings as settings
     import db.database as database
     import models.market_data as market_data
-    import services.db_size_checker as db_size_checker
     import services.data_processor as data_processor
+    import services.db_size_checker as db_size_checker
 
     importlib.reload(settings)
     importlib.reload(database)
@@ -42,6 +35,8 @@ def processor(tmp_path, monkeypatch):
     yield proc
     proc.stop()
     database.Base.metadata.drop_all(bind=database.engine)
+
+
 
 def make_sample_data():
     now = datetime.now(timezone.utc)
@@ -95,10 +90,11 @@ def make_sample_data():
     ]
 
 
+
 def test_add_to_save_queue_and_persistence(processor):
     from db.database import SessionLocal
     from models.market_data import TickerData
-    
+
     sample_data = make_sample_data()
     processor.add_to_save_queue(sample_data)
 
@@ -110,4 +106,3 @@ def test_add_to_save_queue_and_persistence(processor):
         assert len(records) == len(sample_data)
         symbols = {r.symbol for r in records}
         assert {'BTCUSDT', 'ETHUSDT'} == symbols
-
