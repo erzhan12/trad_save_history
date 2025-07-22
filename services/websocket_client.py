@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Any, Callable, Dict
+from typing import Any, Dict
 
 from pybit.unified_trading import WebSocket
 
@@ -11,20 +11,19 @@ logger = logging.getLogger("bybit_collector.websocket")
 
 
 class BybitWebSocketClient:
-    def __init__(self, message_handler: Callable[[str, Dict[str, Any]], None]):
-        self.ticker_data = {}
-        self.message_handler = message_handler
+    def __init__(self):
+        self.ticker_data: Dict[str, list[Dict[str, Any]]] = {}
         self.ws_public = None
         self.ws_private = None
-        self.subscriptions = []
+        self.subscriptions: list[str] = []
         self.data_processor = DataProcessor()
 
     def connect_public(self):
         """Connect to Bybit WebSocket API and subscribe to channels."""
         try:
             self.ws_public = WebSocket(
-                testnet=False,
-                channel_type='linear'
+                testnet=TESTNET,
+                channel_type="linear",
             )
             for symbol in SYMBOLS:  # Subscribe to all symbols
                 self.ws_public.ticker_stream(symbol, self.handle_ticker)
