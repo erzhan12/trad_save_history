@@ -55,6 +55,12 @@ class DataProcessor:
     def stop(self):
         """Stop the data processor and cleanup resources."""
         logger.info("Stopping DataProcessor...")
+        
+        # Wait for any remaining data in the queue to be processed
+        if not self._save_queue.empty():
+            logger.info("Waiting for remaining data in queue to be processed...")
+            self._save_queue.join()
+        
         # Signal save thread to stop
         self._save_queue.put(None)
         if self._save_thread:

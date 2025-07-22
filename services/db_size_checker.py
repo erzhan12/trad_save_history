@@ -22,18 +22,40 @@ class DBSizeChecker:
 
     def _get_sqlite_size(self) -> float:
         """Get the size of SQLite database in bytes."""
-        with engine.connect() as conn:
-            result = conn.execute(text("""
-                SELECT page_count * page_size as size 
-                FROM pragma_page_count(), pragma_page_size()
-            """))
-            return float(result.scalar())
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(text("""
+                    SELECT page_count * page_size as size 
+                    FROM pragma_page_count(), pragma_page_size()
+                """))
+                return float(result.scalar())
+        except Exception as e:
+            logger.error(f"Error getting SQLite database size: {e}")
+            return 0.0
 
     def _get_postgresql_size(self) -> float:
         """Get the size of PostgreSQL database in bytes."""
-        with engine.connect() as conn:
-            result = conn.execute(text("SELECT pg_database_size(current_database())"))
-            return float(result.scalar())
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT pg_database_size(current_database())"))
+                return float(result.scalar())
+        except Exception as e:
+            logger.error(f"Error getting PostgreSQL database size: {e}")
+            return 0.0
+
+    def _get_mysql_size(self) -> float:
+        """Get the size of MySQL database in bytes."""
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(text("""
+                    SELECT SUM(data_length + index_length) 
+                    FROM information_schema.tables 
+                    WHERE table_schema = DATABASE()
+                """))
+                return float(result.scalar() or 0.0)
+        except Exception as e:
+            logger.error(f"Error getting MySQL database size: {e}")
+            return 0.0
 
     def _get_db_size(self) -> float:
         """Get the size of the database in bytes."""
@@ -42,6 +64,8 @@ class DBSizeChecker:
                 return self._get_sqlite_size()
             elif DATABASE_URL.startswith('postgresql'):
                 return self._get_postgresql_size()
+            elif DATABASE_URL.startswith('mysql'):
+                return self._get_mysql_size()
             else:
                 logger.warning("Database size check not implemented for this database type")
                 return 0.0

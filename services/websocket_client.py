@@ -116,12 +116,21 @@ class BybitWebSocketClient:
             
     def disconnect(self):
         """Disconnect from WebSocket API and cleanup threads."""
+        # Disconnect public WebSocket
+        if self.ws_public:
+            try:
+                self.ws_public.exit()
+                logger.info("Disconnected from Bybit public WebSocket API")
+            except Exception as e:
+                logger.error(f"Error disconnecting from public WebSocket: {e}")
+        
+        # Disconnect private WebSocket
         if self.ws_private:
             try:
                 self.ws_private.exit()
-                logger.info("Disconnected from Bybit WebSocket API")
+                logger.info("Disconnected from Bybit private WebSocket API")
             except Exception as e:
-                logger.error(f"Error disconnecting from WebSocket: {e}")
+                logger.error(f"Error disconnecting from private WebSocket: {e}")
         
         # Signal save thread to stop
         self.data_processor.stop()
