@@ -4,8 +4,6 @@ import sys
 import types
 from pathlib import Path
 
-import pytest
-
 
 def test_setup_logging_adds_handlers(monkeypatch):
     # Ensure project root is on sys.path for module imports

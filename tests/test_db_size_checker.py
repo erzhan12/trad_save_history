@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("sqlalchemy")
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from services import db_size_checker
