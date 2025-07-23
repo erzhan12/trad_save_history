@@ -39,3 +39,6 @@ htmlcov/
 .cache
 coverage.xml
 *.cover
+
+# SQL Scripts
+sql_scripts/
