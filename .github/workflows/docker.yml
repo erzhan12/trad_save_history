@@ -129,6 +129,12 @@ jobs:
         
         echo "Deploying to existing droplet: $DROPLET_IP"
         
+        # Set up SSH key
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+        ssh-keyscan -H $DROPLET_IP >> ~/.ssh/known_hosts
+        
         # Copy docker-compose file
         scp -o StrictHostKeyChecking=no docker-compose.yml root@$DROPLET_IP:/root/
         
