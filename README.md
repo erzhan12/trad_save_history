@@ -75,7 +75,7 @@ A Python application that collects real-time market data from Bybit's WebSocket 
 
 2. **Install dependencies**
    ```bash
-   pip install -e .
+   uv sync
    ```
 
 3. **Configure and run**
