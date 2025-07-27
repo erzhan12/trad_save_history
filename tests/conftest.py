@@ -20,8 +20,8 @@ os.environ["TICKER_BATCH_SIZE"] = "10"
 os.environ["DB_SIZE_CHECK_INTERVAL"] = "1"
 
 # Import modules after setting environment variables
-from config.settings import DATABASE_URL
-from db.database import engine, Base
+from db.database import Base, engine
+
 
 @pytest.fixture(scope="session")
 def test_database():
@@ -31,6 +31,7 @@ def test_database():
     # Clean up test database
     if os.path.exists("test_bybit_data.db"):
         os.remove("test_bybit_data.db")
+
 
 @pytest.fixture(autouse=True)
 def setup_test_env(test_database):
