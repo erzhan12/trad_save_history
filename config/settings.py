@@ -16,7 +16,7 @@ SYMBOLS = os.getenv("SYMBOLS", "BTCUSDT,ETHUSDT,LTCUSDT,SOLUSDT").split(",")
 CHANNELS = os.getenv("CHANNELS", "orderbook.50,trade,kline.1m").split(",")
 
 # Database Configuration
-DB_TYPE = os.getenv("DB_TYPE", "postgresql").lower()
+DB_TYPE = os.getenv("DB_TYPE", "sqlite").lower()  # Default to sqlite for testing
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "")
 DB_NAME = os.getenv("DB_NAME", "bybit_data")
@@ -27,9 +27,13 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 if DB_TYPE == "sqlite":
     DATABASE_URL = f"sqlite:///{DB_NAME}.db"
 elif DB_TYPE == "postgresql":
-    DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    # Handle empty port for PostgreSQL
+    port_suffix = f":{DB_PORT}" if DB_PORT else ""
+    DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}{port_suffix}/{DB_NAME}"
 elif DB_TYPE == "mysql":
-    DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    # Handle empty port for MySQL
+    port_suffix = f":{DB_PORT}" if DB_PORT else ""
+    DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}{port_suffix}/{DB_NAME}"
 else:
     raise ValueError(f"Unsupported database type: {DB_TYPE}")
 

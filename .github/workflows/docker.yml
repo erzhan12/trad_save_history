@@ -41,7 +41,18 @@ jobs:
       run: uv sync
       
     - name: Run tests
-      run: uv run pytest tests/ -v
+      run: |
+        export DB_TYPE=sqlite
+        export DB_NAME=test_bybit_data
+        export LOG_LEVEL=DEBUG
+        export USE_TESTNET=True
+        export WS_PRIVATE=False
+        export SYMBOLS=BTCUSDT
+        export CHANNELS=trade
+        export DATA_RETENTION_DAYS=1
+        export TICKER_BATCH_SIZE=10
+        export DB_SIZE_CHECK_INTERVAL=1
+        uv run pytest tests/ -v
       
     - name: Run linting
       run: uv run ruff check .
