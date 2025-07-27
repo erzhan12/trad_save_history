@@ -1,0 +1,192 @@
+name: Docker CI/CD to DigitalOcean
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - 'README.md'
+      - '.gitignore'
+      - 'docs/**'
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+      - '.gitignore'
+      - 'docs/**'
+
+env:
+  REGISTRY: registry.digitalocean.com
+  IMAGE_NAME: trad-save-history-registry/bybit-data-collector
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        
+    - name: Install uv
+      uses: astral-sh/setup-uv@v1
+      with:
+        version: latest
+        
+    - name: Install dependencies
+      run: uv sync
+      
+    - name: Run tests
+      run: uv run pytest tests/ -v
+      
+    - name: Run linting
+      run: uv run ruff check .
+
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to DigitalOcean Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+        password: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-
+          
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Output image digest
+      run: echo ${{ steps.build.outputs.digest }}
+
+  deploy:
+    name: Deploy to DigitalOcean Droplet
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install doctl
+      uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+        
+    - name: Deploy to existing droplet
+      run: |
+        # Get existing droplet IP from secret or environment variable
+        DROPLET_IP="${{ secrets.DROPLET_IP }}"
+        
+        if [ -z "$DROPLET_IP" ]; then
+          echo "Error: DROPLET_IP secret not set. Please add your droplet IP to GitHub secrets."
+          exit 1
+        fi
+        
+        echo "Deploying to existing droplet: $DROPLET_IP"
+        
+        # Copy docker-compose file
+        scp -o StrictHostKeyChecking=no docker-compose.yml root@$DROPLET_IP:/root/
+        
+        # Deploy application
+        ssh -o StrictHostKeyChecking=no root@$DROPLET_IP << 'EOF'
+          # Install Docker if not installed
+          if ! command -v docker &> /dev/null; then
+            curl -fsSL https://get.docker.com -o get-docker.sh
+            sh get-docker.sh
+          fi
+          
+          # Install Docker Compose if not installed
+          if ! command -v docker-compose &> /dev/null; then
+            curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            chmod +x /usr/local/bin/docker-compose
+          fi
+          
+          # Login to DigitalOcean registry
+          doctl registry docker-config | docker login registry.digitalocean.com --username $(doctl account get --format Email --no-header) --password-stdin
+          
+          # Create .env file
+          cat > .env << ENVEOF
+        DB_TYPE=postgresql
+        DB_HOST=${{ secrets.DB_HOST }}
+        DB_PORT=${{ secrets.DB_PORT }}
+        DB_NAME=${{ secrets.DB_NAME }}
+        DB_USER=${{ secrets.DB_USER }}
+        DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+        BYBIT_API_KEY=${{ secrets.BYBIT_API_KEY }}
+        BYBIT_API_SECRET=${{ secrets.BYBIT_API_SECRET }}
+        USE_TESTNET=False
+        WS_PRIVATE=False
+        SYMBOLS=BTCUSDT,ETHUSDT,LTCUSDT,SOLUSDT
+        CHANNELS=orderbook.50,trade,kline.1m
+        LOG_LEVEL=INFO
+        DATA_RETENTION_DAYS=30
+        TICKER_BATCH_SIZE=100
+        DB_SIZE_CHECK_INTERVAL=30
+        ENVEOF
+          
+          # Pull and run the application
+          docker-compose pull
+          docker-compose up -d
+          
+          echo "Deployment completed!"
+        EOF
+        
+        echo "Deployment to droplet $DROPLET_IP completed!"
+      env:
+        DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif' 

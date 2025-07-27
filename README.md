@@ -85,6 +85,42 @@ A Python application that collects real-time market data from Bybit's WebSocket 
    python main.py
    ```
 
+## CI/CD Pipeline
+
+This project includes a comprehensive CI/CD pipeline that automatically builds, tests, and deploys to DigitalOcean.
+
+### GitHub Actions Workflow
+
+The workflow (`.github/workflows/docker.yml`) includes:
+
+1. **Testing**: Runs pytest and ruff linting
+2. **Building**: Builds Docker image and pushes to DigitalOcean Container Registry
+3. **Deployment**: Deploys to DigitalOcean Droplet (VPS)
+4. **Security**: Runs Trivy vulnerability scanning
+
+### Required Secrets
+
+Add these secrets to your GitHub repository:
+
+- `DIGITALOCEAN_ACCESS_TOKEN`: Your DigitalOcean API token
+- `DROPLET_IP`: Your existing DigitalOcean droplet IP address
+- `DB_HOST`: Your PostgreSQL database host
+- `DB_PORT`: Your PostgreSQL database port
+- `DB_NAME`: Your PostgreSQL database name
+- `DB_USER`: Your PostgreSQL database username
+- `DB_PASSWORD`: Your PostgreSQL database password
+- `BYBIT_API_KEY`: Your Bybit API key
+- `BYBIT_API_SECRET`: Your Bybit API secret
+
+### Deployment
+
+The pipeline automatically deploys on pushes to the `main` branch. The app will be deployed to:
+- **Platform**: DigitalOcean Droplet (VPS)
+- **Region**: San Francisco 2 (sfo2)
+- **Instance Size**: 1 vCPU, 1GB RAM
+- **Image**: Docker 20.04
+- **Database**: SQLite (local) or configure PostgreSQL manually
+
 ## Configuration
 
 The application is configured through environment variables. Copy `.env.example` to `.env` and modify the settings:
