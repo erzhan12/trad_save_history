@@ -2,8 +2,7 @@ version: '3.8'
 
 services:
   app:
-    build: .
-    image: bybit-data-collector-image
+    image: registry.digitalocean.com/trad-save-history-registry/bybit-data-collector
     container_name: bybit-data-collector
     environment:
       - DB_TYPE=${DB_TYPE:-postgresql}
