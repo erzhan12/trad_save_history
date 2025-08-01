@@ -112,6 +112,7 @@ Add these secrets to your GitHub repository:
 - `BYBIT_API_KEY`: Your Bybit API key
 - `BYBIT_API_SECRET`: Your Bybit API secret
 
+
 ### Deployment
 
 The pipeline automatically deploys on pushes to the `main` branch. The app will be deployed to:
